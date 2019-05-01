@@ -1,15 +1,29 @@
 import React from 'react';
 import { StyleSheet, Text, View, Button, FlatList, ToastAndroid } from 'react-native';
 import ListItem from './src/ListItem/ListItem';
+import {listFiles, createFile, copyFile} from './src/services/fileSystemService';
 
 var SQLite = require('react-native-sqlite-storage');
 var db = SQLite.openDatabase({name: 'products.db', createFromLocation: '~products.db'});
 
+const IMAGES = [
+  '1.png',
+  '2.png',
+  '3.png',
+  '4.png',
+  '5.png',
+  '6.png',
+  '7.png',
+  '8.png',
+  '9.png',
+  '10.png',  
+];
+
 export default class App extends React.Component {
-  state = {
-    title: 'tilin',
+  state = {    
     buttonGD: 'Generate data',
     buttonS: 'Show',
+    buttonDelete: 'Drop products',
     products: [],
     storeTime: 0,
     loadTime: 0, 
@@ -19,6 +33,14 @@ export default class App extends React.Component {
   constructor(props) {
     super(props);    
     this.getProductsCount();
+  }
+  deleteProducts = () => {
+    db.transaction((tx) => {      
+      tx.executeSql('DELETE FROM products', [], (tx, results) => {
+        ToastAndroid.show(`All products have been removed`, ToastAndroid.SHORT);
+        this.setState({ ...this.state, productsCount: 0});
+      },(_) => {});
+    });    
   }
 
   showList = () => {
@@ -44,23 +66,9 @@ export default class App extends React.Component {
         ToastAndroid.show(`Something happend`, ToastAndroid.SHORT);
       });
     });
-  }
-  renderList = () => {
-    return (
-      <FlatList 
-        style={styles.flatList}
-        data= {this.state.products}        
-        renderItem= {({item}) => (          
-          <ListItem name={item.name} price={item.price}/>
-        )}
-        keyExtractor={item => `${item.id}`}
-      />
-    );
-
-  }
+  }  
   getProductsCount = () => {    
-    db.transaction((tx) => {
-      //tx.executeSql('DELETE FROM productsCount;', [], (tx, results) => {});
+    db.transaction((tx) => {      
       tx.executeSql('SELECT COUNT(*) as productsCount FROM products;', [], (tx, results) => {
         ToastAndroid.show(`There are ${results.rows.item(0).productsCount} products`, ToastAndroid.SHORT);
         this.setState({ ...this.state, productsCount: results.rows.item(0).productsCount});
@@ -89,6 +97,42 @@ export default class App extends React.Component {
     });
   }
 
+  renderList = () => {
+    return (
+      <FlatList 
+        style={styles.flatList}
+        data= {this.state.products}        
+        renderItem= {({item}) => (          
+          <ListItem name={item.name} price={item.price}/>
+        )}
+        keyExtractor={item => `${item.id}`}
+      />
+    );
+  }
+
+  seeFiles = () => {
+    const index = Math.floor(Math.random()*9);
+    console.log(IMAGES[index]);
+    console.log(IMAGES[index]);
+    /*copyFile(image)
+      .then(_=> {
+        console.log(_);
+        console.log("success");
+      })
+      .catch(err=> {
+        console.log("error");
+        console.log(err.message, err.code);
+      });*/
+    //listFiles();
+    createFile('testing.txt')
+      .then(_=> {
+        console.log(_);
+        console.log("success");
+      })
+      .catch(err=> {
+        console.log(err.message, err.code);
+      });
+  }
 
   render() {
     
@@ -96,6 +140,11 @@ export default class App extends React.Component {
       <View style={styles.container}>
         <View style={styles.titleContainer}>
           <Text style= {styles.title}>Products</Text>
+          <Button
+            style={styles.buttonRed}
+            title={this.state.buttonDelete}
+            onPress={this.deleteProducts}
+          ></Button>
         </View>
         <View style={styles.row}>
           <Text style={styles.paragraph}>Numbers of products: {this.state.productsCount}</Text>          
@@ -128,8 +177,11 @@ export default class App extends React.Component {
 const styles = StyleSheet.create({
   button: {
     backgroundColor: '#ffff00',
-    padding: 5,
-    /*height: 30,*/
+    padding: 5,    
+  },
+  buttonRed: {
+    backgroundColor: '#ff0000',
+    padding: 5,    
   },
   container: {
     flex: 1,
