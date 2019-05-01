@@ -1,7 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View, Button } from 'react-native';
+import { StyleSheet, Text, View, Button, FlatList, ToastAndroid } from 'react-native';
 import ListItem from './src/ListItem/ListItem';
-import Faker from 'faker';
 
 var SQLite = require('react-native-sqlite-storage');
 var db = SQLite.openDatabase({name: 'products.db', createFromLocation: '~products.db'});
@@ -13,17 +12,20 @@ export default class App extends React.Component {
     buttonS: 'Show',
     products: [],
     storeTime: 0,
-    loadTime: 0,    
+    loadTime: 0, 
+    productsCount: 0,
   };
 
   constructor(props) {
     super(props);    
+    this.getProductsCount();
   }
 
   showList = () => {
     db.transaction((tx) => {
       let startTime = new Date();
-      tx.executeSql('SELECT * FROM products', [], (tx, results) => {
+      tx.executeSql('SELECT * FROM products ORDER BY id DESC', [], (tx, results) => {
+        ToastAndroid.show(`There are ${results.rows.length} products`, ToastAndroid.SHORT);
         let len = results.rows.length;
         let products = []
         for (let i = 0; i < len; i++) {
@@ -35,29 +37,52 @@ export default class App extends React.Component {
         this.setState({
           ...this.state,
           products,
+          getProductsCount: products.length,
           loadTime,
         })
+      }, (err)=> {
+        ToastAndroid.show(`Something happend`, ToastAndroid.SHORT);
       });
     });
   }
+  renderList = () => {
+    return (
+      <FlatList 
+        style={styles.flatList}
+        data= {this.state.products}        
+        renderItem= {({item}) => (          
+          <ListItem name={item.name} price={item.price}/>
+        )}
+        keyExtractor={item => `${item.id}`}
+      />
+    );
 
+  }
+  getProductsCount = () => {    
+    db.transaction((tx) => {
+      //tx.executeSql('DELETE FROM productsCount;', [], (tx, results) => {});
+      tx.executeSql('SELECT COUNT(*) as productsCount FROM products;', [], (tx, results) => {
+        ToastAndroid.show(`There are ${results.rows.item(0).productsCount} products`, ToastAndroid.SHORT);
+        this.setState({ ...this.state, productsCount: results.rows.item(0).productsCount});
+      },(_) => {});
+    });
+  }
   generateItems = () => {
+    let startTime = new Date();
     db.transaction(async(tx) => {
-      /*let query = 'INSERT INTO products(name, price) ';
-      let data = [];
-      for(let i=1; i<=1000; i++) {
-        query += i===1 ? 'VALUES(?,?)' : ',VALUES(?,?)';
-        data.push();
-      }*/
-      let startTime = new Date();
       for(let i=1; i<=1000; i++) {
         let rand = Math.floor(Math.random() * 9999) + 1
-        await tx.executeSql('INSERT INTO products(name, price) VALUES(?, ?)', [`product-${rand}`, rand], (tx, results) => {        
-          if(results.rowsAffected > 0) {
-
-          }       
+        await tx.executeSql('INSERT INTO products(name, price) VALUES(?, ?)', [`product-${rand}`, rand], (tx, results) => {
+          /*if(results.rowsAffected > 0) {
+          }*/
         });
       }
+    }, (error) => {
+      let endTime = new Date();
+      storeTime = (endTime - startTime);
+      this.setState({ ...this.state, storeTime});
+    }, () => {
+      this.getProductsCount();
       let endTime = new Date();
       storeTime = (endTime - startTime);
       this.setState({ ...this.state, storeTime});
@@ -70,13 +95,12 @@ export default class App extends React.Component {
     return (
       <View style={styles.container}>
         <View style={styles.titleContainer}>
-          <Text style= {styles.title}>Productos</Text>
+          <Text style= {styles.title}>Products</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.paragraph}>Numbers of products: {this.state.products.length}</Text>          
+          <Text style={styles.paragraph}>Numbers of products: {this.state.productsCount}</Text>          
         </View>
-        <View style={styles.row}>
-          <Text style={styles.paragraph}>Products to generate</Text>
+        <View style={styles.row}>          
           <Button
             style={styles.button}            
             title={this.state.buttonGD}
@@ -84,8 +108,7 @@ export default class App extends React.Component {
           ></Button>
           <Text style={styles.paragraph}> Time[ms]: {this.state.storeTime}</Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.paragraph}>Products to list</Text>
+        <View style={styles.row}>          
           <Button
             style={styles.button}
             title={this.state.buttonS}
@@ -93,8 +116,9 @@ export default class App extends React.Component {
           ></Button>
           <Text style={styles.paragraph}> Time[ms]: {this.state.loadTime}</Text>
         </View>
-        <View style={styles.listContainer}>          
-          <ListItem products={this.state.products}/>
+        <View style={styles.listContainer}>
+          {this.renderList()}
+          {/*<ListItem products={this.state.products}/>*/}
         </View>
       </View>
     );
@@ -113,6 +137,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'flex-start',    
     justifyContent: 'flex-start',
+    paddingLeft: 5,
+  },
+  flatList: {
+    width: '100%',
   },
   listContainer: {
     flexDirection: 'column',
