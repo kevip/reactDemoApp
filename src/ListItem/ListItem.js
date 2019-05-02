@@ -23,16 +23,17 @@ const images = [
     imageCard9,
     imageCard10
 ]
-
+const RNFS = require('react-native-fs');
+const IMAGES_PATH = 'images';
 const listItem = (props) => {
     const index = Math.floor(Math.random()*9);
+    console.log(`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}/${props.image}`);
     return (
-    <View style={styles.listItem}>
-        <Image source= {images[index]} style={styles.image}/>
-        <Text style={styles.item}>{props.name} - $ {props.price}</Text>
-        {/*props.products.map(product => (
-        <Text key={product.id} style={styles.item}>{product.name} - $ {product.price}</Text>
-        ))*/}
+    <View style={styles.listItem}>        
+        <Image 
+        source= {{uri: `file://${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}/${props.image}`}}
+        style={styles.image}/>
+        <Text style={styles.item}>{props.name} - $ {props.price}</Text>        
     </View>
 )};
 

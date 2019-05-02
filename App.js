@@ -53,8 +53,9 @@ export default class App extends React.Component {
         let products = []
         for (let i = 0; i < len; i++) {
           let row = results.rows.item(i);
-          products.push({id: row.id, name: row.name, price: row.price, imagePath: image_path});          
+          products.push({id: row.id, name: row.name, price: row.price, imagePath: row.image_path});          
         }
+        console.log(products);
         let endTime = new Date();
         loadTime = (endTime - startTime);
         this.setState({
@@ -68,6 +69,7 @@ export default class App extends React.Component {
       });
     });
   }  
+  
   getProductsCount = () => {    
     db.transaction((tx) => {      
       tx.executeSql('SELECT COUNT(*) as productsCount FROM products;', [], (tx, results) => {
@@ -76,6 +78,7 @@ export default class App extends React.Component {
       },(_) => {});
     });
   }
+
   generateItems = () => {
     let startTime = new Date();
     db.transaction(async(tx) => {
@@ -87,10 +90,9 @@ export default class App extends React.Component {
           const index = Math.floor(Math.random()*9);
           copyFile(IMAGES[index], imagePath)
             .then(_=> {
-              console.log("success");
-              readFile(imagePath);
+              console.log("successfully copied!");              
             })
-            .catch(err=> {        
+            .catch(err=> {
               console.log(err.message, err.code);
             });
           /*if(results.rowsAffected > 0) {
@@ -110,12 +112,13 @@ export default class App extends React.Component {
   }
 
   renderList = () => {
+    console.log(this.state.products.length);
     return (
       <FlatList 
         style={styles.flatList}
         data= {this.state.products}        
         renderItem= {({item}) => (          
-          <ListItem name={item.name} price={item.price} path={item.imagePath}/>
+          <ListItem name={item.name} price={item.price} image={item.imagePath}/>
         )}
         keyExtractor={item => `${item.id}`}
       />
