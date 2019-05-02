@@ -1,5 +1,5 @@
 const RNFS = require('react-native-fs');
-const IMAGES_PATH = 'product-images';
+const IMAGES_PATH = 'images';
 
 export const openFile = () => {
 
@@ -21,31 +21,40 @@ export const createFile = (fileName) => {
     })
 }
 
-export const copyFile = (fileName) => {
-    return RNFS.copyFileAssets(`images/${fileName}`,`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}/${fileName}`);
+export const copyFile = (assetFileName, fileName) => {
+    return RNFS.existsAssets(`images/${assetFileName}`).
+        then( exists => {
+            if(exists) {
+                return RNFS.exists(`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}`);
+            } else {
+                throw "assets folder doesn't exists";
+            }
+        }).
+        then(exists => {
+            console.log(exists);
+            if(exists) {
+                return RNFS.copyFileAssets(`${IMAGES_PATH}/${assetFileName}`,`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}/${fileName}`);
+            } else {
+                return RNFS.mkdir(`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}`).
+                    then( _=> {
+                        console.log("creating directory...");
+                        return RNFS.copyFileAssets(`${IMAGES_PATH}/${assetFileName}`,`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}/${fileName}`);
+                    })
+            }
+        }).
+        catch( error => {
+            console.log(error);
+        });
+    // return RNFS.copyFileAssets(`/images/${fileName}`,`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}/${fileName}`);
 }
 
-export const listFiles = () => {
+export const readFile = (fileName) => {
     // get a list of files and directories in the main bundle
-    RNFS.readdir(RNFS.DocumentDirectoryPath) // On Android, use "RNFS.DocumentDirectoryPath" (MainBundlePath is not defined)
-        .then((result) => {
-            console.log('GOT RESULT', result);            
-            // stat the first file
-            //return Promise.all([RNFS.stat(result[0].path), result[0].path]);
-        })
-        /*.then((statResult) => {
-            if (statResult[0].isFile()) {
-                // if we have a file, read it
-                return RNFS.readFile(statResult[1], 'utf8');
-            }
-
-            return 'no file';
-        })
-        .then((contents) => {
-            // log the file contents
-            console.log(contents);
-        })*/
-        .catch((err) => {
-            console.log(err.message, err.code);
-        });
+    RNFS.readFile(`${RNFS.DocumentDirectoryPath}/${IMAGES_PATH}/${fileName}`, 'base64').
+        then( _ => {
+            console.log(_);
+        }).
+        catch(error => {
+            console.log(error);
+        });    
 }

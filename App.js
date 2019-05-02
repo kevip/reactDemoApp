@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, Button, FlatList, ToastAndroid } from 'react-native';
 import ListItem from './src/ListItem/ListItem';
-import {listFiles, createFile, copyFile} from './src/services/fileSystemService';
+import {readFile, createFile, copyFile} from './src/services/fileSystemService';
 
 var SQLite = require('react-native-sqlite-storage');
 var db = SQLite.openDatabase({name: 'products.db', createFromLocation: '~products.db'});
@@ -34,12 +34,13 @@ export default class App extends React.Component {
     super(props);    
     this.getProductsCount();
   }
+  
   deleteProducts = () => {
     db.transaction((tx) => {      
       tx.executeSql('DELETE FROM products', [], (tx, results) => {
         ToastAndroid.show(`All products have been removed`, ToastAndroid.SHORT);
         this.setState({ ...this.state, productsCount: 0});
-      },(_) => {});
+      },(_) => { console.log(_);});
     });    
   }
 
@@ -52,7 +53,7 @@ export default class App extends React.Component {
         let products = []
         for (let i = 0; i < len; i++) {
           let row = results.rows.item(i);
-          products.push({id: row.id, name: row.name, price: row.price});          
+          products.push({id: row.id, name: row.name, price: row.price, imagePath: image_path});          
         }
         let endTime = new Date();
         loadTime = (endTime - startTime);
@@ -78,9 +79,20 @@ export default class App extends React.Component {
   generateItems = () => {
     let startTime = new Date();
     db.transaction(async(tx) => {
-      for(let i=1; i<=1000; i++) {
-        let rand = Math.floor(Math.random() * 9999) + 1
-        await tx.executeSql('INSERT INTO products(name, price) VALUES(?, ?)', [`product-${rand}`, rand], (tx, results) => {
+      for(let i=1; i<=10; i++) {
+        let rand = Math.floor(Math.random() * 9999) + 1;
+        const imagePath = `${Math.floor(Math.random() * 99999)}${(new Date()).getTime()}.png`;//concat random number + date
+        await tx.executeSql('INSERT INTO products(name, price, image_path) VALUES(?, ?, ?)', [`product-${rand}`, rand, imagePath], (tx, results) => {
+          console.log(results.insertId, imagePath);
+          const index = Math.floor(Math.random()*9);
+          copyFile(IMAGES[index], imagePath)
+            .then(_=> {
+              console.log("success");
+              readFile(imagePath);
+            })
+            .catch(err=> {        
+              console.log(err.message, err.code);
+            });
           /*if(results.rowsAffected > 0) {
           }*/
         });
@@ -103,36 +115,12 @@ export default class App extends React.Component {
         style={styles.flatList}
         data= {this.state.products}        
         renderItem= {({item}) => (          
-          <ListItem name={item.name} price={item.price}/>
+          <ListItem name={item.name} price={item.price} path={item.imagePath}/>
         )}
         keyExtractor={item => `${item.id}`}
       />
     );
-  }
-
-  seeFiles = () => {
-    const index = Math.floor(Math.random()*9);
-    console.log(IMAGES[index]);
-    console.log(IMAGES[index]);
-    /*copyFile(image)
-      .then(_=> {
-        console.log(_);
-        console.log("success");
-      })
-      .catch(err=> {
-        console.log("error");
-        console.log(err.message, err.code);
-      });*/
-    //listFiles();
-    createFile('testing.txt')
-      .then(_=> {
-        console.log(_);
-        console.log("success");
-      })
-      .catch(err=> {
-        console.log(err.message, err.code);
-      });
-  }
+  }  
 
   render() {
     
