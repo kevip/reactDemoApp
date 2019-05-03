@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, Button, FlatList, ToastAndroid } from 'react-native';
+import { StyleSheet, Text, View, Button, FlatList, ToastAndroid, TextInput } from 'react-native';
 import ListItem from './src/ListItem/ListItem';
 import {readFile, createFile, copyFile} from './src/services/fileSystemService';
 
@@ -28,11 +28,15 @@ export default class App extends React.Component {
     storeTime: 0,
     loadTime: 0, 
     productsCount: 0,
+    quantityToGenerate: 0,
+    quantityToShow: 0,
+    disableGenerateButton: false,
+    disableShowButton: false
   };
 
   constructor(props) {
     super(props);    
-    this.getProductsCount();
+    this.getProductsCount(true);
   }
   
   deleteProducts = () => {
@@ -44,81 +48,95 @@ export default class App extends React.Component {
     });    
   }
 
-  showList = () => {
+  showList = (quantity) => {
+    this.setState({...this.state, disableShowButton: true});
+    let startTime = new Date();
+    let products = [];
     db.transaction((tx) => {
-      let startTime = new Date();
-      tx.executeSql('SELECT * FROM products ORDER BY id DESC', [], (tx, results) => {
-        ToastAndroid.show(`There are ${results.rows.length} products`, ToastAndroid.SHORT);
+      tx.executeSql('SELECT * FROM products LIMIT ?', [quantity], (tx, results) => {        
+        ToastAndroid.show(`${results.rows.length} products found`, ToastAndroid.SHORT);
         let len = results.rows.length;
-        let products = []
         for (let i = 0; i < len; i++) {
           let row = results.rows.item(i);
           products.push({id: row.id, name: row.name, price: row.price, imagePath: row.image_path});          
-        }
-        console.log(products);
-        let endTime = new Date();
-        loadTime = (endTime - startTime);
-        this.setState({
-          ...this.state,
-          products,
-          getProductsCount: products.length,
-          loadTime,
-        })
-      }, (err)=> {
-        ToastAndroid.show(`Something happend`, ToastAndroid.SHORT);
+        }                
       });
+    }, err => {      
+      let endTime = new Date();
+      loadTime = (endTime - startTime);
+      this.setState({
+        ...this.state,
+        products,
+        getProductsCount: products.length,
+        loadTime,
+        disableShowButton: false
+      });
+      ToastAndroid.show(`Something happend`, ToastAndroid.SHORT);
+    }, _ => {
+      let endTime = new Date();
+      loadTime = (endTime - startTime);      
+      this.setState({
+        ...this.state,
+        products,
+        getProductsCount: products.length,
+        loadTime,
+        disableShowButton: false
+      });      
     });
   }  
   
-  getProductsCount = () => {    
+  getProductsCount = (showToast) => {    
     db.transaction((tx) => {      
       tx.executeSql('SELECT COUNT(*) as productsCount FROM products;', [], (tx, results) => {
-        ToastAndroid.show(`There are ${results.rows.item(0).productsCount} products`, ToastAndroid.SHORT);
+        if (showToast) {
+          ToastAndroid.show(`There are ${results.rows.item(0).productsCount} products`, ToastAndroid.SHORT);
+        }
         this.setState({ ...this.state, productsCount: results.rows.item(0).productsCount});
       },(_) => {});
     });
   }
 
-  generateItems = () => {
+  generateItems = (quantity) => {
     let startTime = new Date();
+    this.setState({ ...this.state, disableGenerateButton: true});
     db.transaction(async(tx) => {
-      for(let i=1; i<=10; i++) {
+      for(let i=1; i<=quantity; i++) {
         let rand = Math.floor(Math.random() * 9999) + 1;
         const imagePath = `${Math.floor(Math.random() * 99999)}${(new Date()).getTime()}.png`;//concat random number + date
-        await tx.executeSql('INSERT INTO products(name, price, image_path) VALUES(?, ?, ?)', [`product-${rand}`, rand, imagePath], (tx, results) => {
-          console.log(results.insertId, imagePath);
+        await tx.executeSql('INSERT INTO products(name, price, image_path) VALUES(?, ?, ?)', [`product-${rand}`, rand, imagePath], async (tx, results) => {
           const index = Math.floor(Math.random()*9);
-          copyFile(IMAGES[index], imagePath)
-            .then(_=> {
-              console.log("successfully copied!");              
+          await copyFile(IMAGES[index], imagePath)
+            .then(async _=> {
+              await console.log("successfully copied!");              
             })
             .catch(err=> {
               console.log(err.message, err.code);
             });
-          /*if(results.rowsAffected > 0) {
-          }*/
+        }, err => {}
+        , _ => {
+          console.log("created!");
         });
       }
     }, (error) => {
       let endTime = new Date();
       storeTime = (endTime - startTime);
-      this.setState({ ...this.state, storeTime});
+      this.setState({ ...this.state, storeTime, disableGenerateButton: false});
     }, () => {
-      this.getProductsCount();
+      ToastAndroid.show(`${quantity} products created`, ToastAndroid.SHORT);
+      this.getProductsCount(false);
       let endTime = new Date();
       storeTime = (endTime - startTime);
-      this.setState({ ...this.state, storeTime});
+      this.setState({ ...this.state, storeTime, disableGenerateButton: false});
     });
   }
 
-  renderList = () => {
-    console.log(this.state.products.length);
+  renderList = () => {    
     return (
       <FlatList 
         style={styles.flatList}
         data= {this.state.products}        
         renderItem= {({item}) => (          
-          <ListItem name={item.name} price={item.price} image={item.imagePath}/>
+          <ListItem id={item.id} name={item.name} price={item.price} image={item.imagePath}/>
         )}
         keyExtractor={item => `${item.id}`}
       />
@@ -133,26 +151,41 @@ export default class App extends React.Component {
           <Text style= {styles.title}>Products</Text>
           <Button
             style={styles.buttonRed}
+            color='red'
             title={this.state.buttonDelete}
             onPress={this.deleteProducts}
           ></Button>
         </View>
         <View style={styles.row}>
-          <Text style={styles.paragraph}>Numbers of products: {this.state.productsCount}</Text>          
+          <Text style={styles.paragraph}>Numbers of products: {this.state.productsCount}</Text>
         </View>
-        <View style={styles.row}>          
+        <View style={styles.row}>
+          <TextInput 
+            placeholder="create products..."
+            keyboardType= 'number-pad'
+            onChangeText={(quantityToGenerate) => this.setState({...this.state, quantityToGenerate})}
+            value={`${this.state.quantityToGenerate}`}
+          ></TextInput>
           <Button
-            style={styles.button}            
+            style={styles.button}
             title={this.state.buttonGD}
-            onPress={this.generateItems}
+            onPress={this.generateItems.bind(this, this.state.quantityToGenerate)}
+            disabled={this.state.disableGenerateButton}
           ></Button>
           <Text style={styles.paragraph}> Time[ms]: {this.state.storeTime}</Text>
         </View>
-        <View style={styles.row}>          
+        <View style={styles.row}>
+        <TextInput 
+            placeholder="show products..."
+            keyboardType= 'number-pad'
+            onChangeText={(quantityToShow) => this.setState({...this.state, quantityToShow})}
+            value={`${this.state.quantityToShow}`}
+          ></TextInput>
           <Button
             style={styles.button}
             title={this.state.buttonS}
-            onPress= {this.showList}
+            onPress= {this.showList.bind(this, this.state.quantityToShow)}
+            disabled={this.state.disableShowButton}
           ></Button>
           <Text style={styles.paragraph}> Time[ms]: {this.state.loadTime}</Text>
         </View>
@@ -187,6 +220,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flexDirection: 'column',
+    height: '50%',
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
     width: '100%'
